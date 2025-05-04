@@ -43,9 +43,9 @@ cd ~/projects
 3. **Clone the repository:**
 
 Run the following command in your terminal:
-`git clone https://github.com/ed-donner/agents.git`
+`git clone https://github.com/sagarnildass/Complete-Agentic-AI-Engineering-Course`
 
-This creates a new directory `agents` within your Projects folder and downloads the course code. Use `cd agents` to enter the directory. This is your "project root directory."
+This creates a new directory `Complete-Agentic-AI-Engineering-Course` within your Projects folder and downloads the course code. Use `cd Complete-Agentic-AI-Engineering-Course` to enter the directory. This is your "project root directory."
 
 ### Part 2: Install Cursor
 
