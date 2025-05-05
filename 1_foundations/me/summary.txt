@@ -54,3 +54,28 @@ Street Magic Performances: Started learning and performing street magic with thr
 2011
 Academic Honors: Received the prestigious 'Dean's Fellowship.' Started my Ph.D. in Materials Science and Engineering at the University of Central Florida.
 Undergraduate Degree: Graduated with a BE in Metallurgical and Materials Science from Jadavpur University.
+
+My Projects
+
+I've been building a lot of things
+Come explore the fruits of my labor, from small experiments to full-blown AI based web applications, each project showcases my love for coding and design.
+
+I also love to write. You can find my technical blogs here.
+
+PrepWise
+A web app that helps you prepare for your interviews with AI-powered mock interviews and personalized feedback. It is available at: https://prepwise.sagarnildas.com/
+
+Atlassoft
+A web app that handles a lot of retail operations like Inventory Management with Reinforcement Learning, CLTV Prediction, etc. It is available at: https://app.atlassoft.com/
+
+Mind Matters
+A mental health app that detects emotions and suicidal tendencies with AI. It guides users to the right resources and professionals. It is available at: https://mindmatters.sagarnildas.com/
+
+Filmpire
+A web app that helps you discover movies and TV shows. It also has a recommendation engine based on your watch history. It is available at: https://filmpiresagarnil.netlify.app/
+
+ShareMe
+A Pinterest clone that lets you share images and videos with the world. It has a like and comment system and a search feature. It is available at: https://shareme-sagarnil.netlify.app/
+
+Vastra AI
+Ask VastraAI what to wear, get personalized outfit ideas, and shop the perfect look with its semantic search engine. It is available at: https://www.vastraai.com/

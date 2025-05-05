@@ -5,6 +5,7 @@ import os
 import requests
 from pypdf import PdfReader
 import gradio as gr
+import base64
 
 
 load_dotenv(override=True)
@@ -19,10 +20,31 @@ def push(text):
         }
     )
 
+def send_email(from_email, name, notes):
+    auth = base64.b64encode(f'api:{os.getenv("MAILGUN_API_KEY")}'.encode()).decode()
+    
+    response = requests.post(
+        f'https://api.mailgun.net/v3/{os.getenv("MAILGUN_DOMAIN")}/messages',
+        headers={
+            'Authorization': f'Basic {auth}'
+        },
+        data={
+            'from': f'Website Contact <mailgun@{os.getenv("MAILGUN_DOMAIN")}>',
+            'to': os.getenv("MAILGUN_RECIPIENT"),
+            'subject': f'New message from {from_email}',
+            'text': f'Name: {name}\nEmail: {from_email}\nNotes: {notes}',
+            'h:Reply-To': from_email
+        }
+    )
+    
+    return response.status_code == 200
+
 
 def record_user_details(email, name="Name not provided", notes="not provided"):
     push(f"Recording {name} with email {email} and notes {notes}")
-    return {"recorded": "ok"}
+    # Send email notification
+    email_sent = send_email(email, name, notes)
+    return {"recorded": "ok", "email_sent": email_sent}
 
 def record_unknown_question(question):
     push(f"Recording {question}")
@@ -106,27 +128,45 @@ Your responsibility is to represent {self.name} for interactions on the website 
 You are given a summary of {self.name}'s background and LinkedIn profile which you can use to answer questions. \
 Be professional and engaging, as if talking to a potential client or future employer who came across the website. \
 If you don't know the answer to any question, use your record_unknown_question tool to record the question that you couldn't answer, even if it's about something trivial or unrelated to career. \
-If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email and record it using your record_user_details tool. "
+If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email and record it using your record_user_details tool. \
+When a user provides their email, both a push notification and an email notification will be sent."
 
         system_prompt += f"\n\n## Summary:\n{self.summary}\n\n## LinkedIn Profile:\n{self.linkedin}\n\n"
         system_prompt += f"With this context, please chat with the user, always staying in character as {self.name}."
         return system_prompt
     
     def chat(self, message, history):
-        messages = [{"role": "system", "content": self.system_prompt()}] + history + [{"role": "user", "content": message}]
+        messages = [{"role": "system", "content": self.system_prompt()}]
+
+        # Check if history is a list of dicts (Gradio "messages" format)
+        if isinstance(history, list) and all(isinstance(h, dict) for h in history):
+            messages.extend(history)
+        else:
+            # Assume it's a list of [user_msg, assistant_msg] pairs
+            for user_msg, assistant_msg in history:
+                messages.append({"role": "user", "content": user_msg})
+                messages.append({"role": "assistant", "content": assistant_msg})
+
+        messages.append({"role": "user", "content": message})
+
         done = False
         while not done:
-            response = self.openai.chat.completions.create(model="gpt-4o-mini", messages=messages, tools=tools)
-            if response.choices[0].finish_reason=="tool_calls":
-                message = response.choices[0].message
-                tool_calls = message.tool_calls
-                results = self.handle_tool_call(tool_calls)
-                messages.append(message)
-                messages.extend(results)
+            response = self.openai.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                tools=tools
+            )
+            if response.choices[0].finish_reason == "tool_calls":
+                tool_calls = response.choices[0].message.tool_calls
+                tool_result = self.handle_tool_call(tool_calls)
+                messages.append(response.choices[0].message)
+                messages.extend(tool_result)
             else:
                 done = True
+
         return response.choices[0].message.content
-    
+
+        
 
 if __name__ == "__main__":
     me = Me()
