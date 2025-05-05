@@ -1,6 +1,5 @@
 requests
 python-dotenv
-gradio>=4.44.1
+gradio
 pypdf
 openai
-fastapi
