@@ -129,7 +129,7 @@ tools = [{"type": "function", "function": record_user_details_json},
 class Me:
 
     def __init__(self):
-        self.openai = OpenAI()
+        self.openai = OpenAI(api_key=os.getenv("GOOGLE_API_KEY"), base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
         self.name = "Sagarnil Das"
         self.rate_limiter = RateLimiter(max_requests=5, time_window=60)  # 5 messages per minute
         reader = PdfReader("me/linkedin.pdf")
@@ -209,7 +209,7 @@ in which they provide their email, then give a summary of the conversation so fa
         done = False
         while not done:
             response = self.openai.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gemini-2.0-flash",
                 messages=messages,
                 tools=tools
             )
