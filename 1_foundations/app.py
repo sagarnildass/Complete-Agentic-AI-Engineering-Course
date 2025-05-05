@@ -6,9 +6,40 @@ import requests
 from pypdf import PdfReader
 import gradio as gr
 import base64
+import time
+from collections import defaultdict
+import fastapi
+from gradio.context import Context
+import logging
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 load_dotenv(override=True)
+
+class RateLimiter:
+    def __init__(self, max_requests=5, time_window=5):
+        # max_requests per time_window seconds
+        self.max_requests = max_requests
+        self.time_window = time_window  # in seconds
+        self.request_history = defaultdict(list)
+        
+    def is_rate_limited(self, user_id):
+        current_time = time.time()
+        # Remove old requests
+        self.request_history[user_id] = [
+            timestamp for timestamp in self.request_history[user_id]
+            if current_time - timestamp < self.time_window
+        ]
+        
+        # Check if user has exceeded the limit
+        if len(self.request_history[user_id]) >= self.max_requests:
+            return True
+        
+        # Add current request
+        self.request_history[user_id].append(current_time)
+        return False
 
 def push(text):
     requests.post(
@@ -100,6 +131,7 @@ class Me:
     def __init__(self):
         self.openai = OpenAI()
         self.name = "Sagarnil Das"
+        self.rate_limiter = RateLimiter(max_requests=5, time_window=60)  # 5 messages per minute
         reader = PdfReader("me/linkedin.pdf")
         self.linkedin = ""
         for page in reader.pages:
@@ -129,13 +161,38 @@ You are given a summary of {self.name}'s background and LinkedIn profile which y
 Be professional and engaging, as if talking to a potential client or future employer who came across the website. \
 If you don't know the answer to any question, use your record_unknown_question tool to record the question that you couldn't answer, even if it's about something trivial or unrelated to career. \
 If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email and record it using your record_user_details tool. \
-When a user provides their email, both a push notification and an email notification will be sent."
+When a user provides their email, both a push notification and an email notification will be sent. If the user does not provide any note in the message \
+in which they provide their email, then give a summary of the conversation so far as the notes."
 
         system_prompt += f"\n\n## Summary:\n{self.summary}\n\n## LinkedIn Profile:\n{self.linkedin}\n\n"
         system_prompt += f"With this context, please chat with the user, always staying in character as {self.name}."
         return system_prompt
     
     def chat(self, message, history):
+        # Get the client IP from Gradio's request context
+        try:
+            # Try to get the real client IP from request headers
+            request = Context.get_context().request
+            # Check for X-Forwarded-For header (common in reverse proxies like HF Spaces)
+            forwarded_for = request.headers.get("X-Forwarded-For")
+            # Check for Cf-Connecting-IP header (Cloudflare)
+            cloudflare_ip = request.headers.get("Cf-Connecting-IP")
+            
+            if forwarded_for:
+                # X-Forwarded-For contains a comma-separated list of IPs, the first one is the client
+                user_id = forwarded_for.split(",")[0].strip()
+            elif cloudflare_ip:
+                user_id = cloudflare_ip
+            else:
+                # Fall back to direct client address
+                user_id = request.client.host
+        except (AttributeError, RuntimeError, fastapi.exceptions.FastAPIError):
+            # Fallback if we can't get context or if running outside of FastAPI
+            user_id = "default_user"
+        logger.debug(f"User ID: {user_id}")
+        if self.rate_limiter.is_rate_limited(user_id):
+            return "You're sending messages too quickly. Please wait a moment before sending another message."
+        
         messages = [{"role": "system", "content": self.system_prompt()}]
 
         # Check if history is a list of dicts (Gradio "messages" format)
