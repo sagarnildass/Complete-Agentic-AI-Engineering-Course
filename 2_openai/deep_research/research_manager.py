@@ -3,40 +3,54 @@ from search_agent import search_agent
 from planner_agent import planner_agent, WebSearchItem, WebSearchPlan
 from writer_agent import writer_agent, ReportData
 from email_agent import email_agent
+from clarifier_agent import clarifier_agent, ClarifyingQuestions
 import asyncio
+from typing import Optional
 
-class ResearchManager:
+class ResearchManagerAgent:
 
-    async def run(self, query: str):
-        """ Run the deep research process, yielding the status updates and the final report"""
+    async def run(self, query: str, clarifying_questions: list[str], clarifying_answers: list[str]):
+        """ Run the deep research process using user-provided clarification answers. """
         trace_id = gen_trace_id()
         with trace("Research trace", trace_id=trace_id):
             print(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}")
             yield f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}"
-            print("Starting research...")
-            search_plan = await self.plan_searches(query)
-            yield "Searches planned, starting to search..."     
+            yield "Planning search based on clarifications..."
+
+            # Plan searches using clarifications and user answers
+            search_plan = await self.plan_searches(query, clarifying_questions, clarifying_answers)
+
+            yield "Searches planned, starting to search..."
             search_results = await self.perform_searches(search_plan)
+
             yield "Searches complete, writing report..."
             report = await self.write_report(query, search_results)
+
             yield "Report written, sending email..."
             await self.send_email(report)
-            yield "Email sent, research complete"
-            yield report.markdown_report
-        
 
-    async def plan_searches(self, query: str) -> WebSearchPlan:
-        """ Plan the searches to perform for the query """
+            yield "✅ Email sent"
+            yield report.markdown_report
+
+    async def plan_searches(self, query: str, questions: list[str], answers: list[str]) -> WebSearchPlan:
+        """ Plan the searches to perform based on clarifications """
         print("Planning searches...")
+
+        # Combine clarifying Q&A into structured prompt
+        clarifying_context = "\n".join(
+            f"Q: {q}\nA: {a}" for q, a in zip(questions, answers)
+        )
+        final_prompt = f"Query: {query}\nClarifications:\n{clarifying_context}"
+
         result = await Runner.run(
             planner_agent,
-            f"Query: {query}",
+            input=final_prompt,
         )
         print(f"Will perform {len(result.final_output.searches)} searches")
         return result.final_output_as(WebSearchPlan)
 
     async def perform_searches(self, search_plan: WebSearchPlan) -> list[str]:
-        """ Perform the searches to perform for the query """
+        """ Perform the searches for the planned queries """
         print("Searching...")
         num_completed = 0
         tasks = [asyncio.create_task(self.search(item)) for item in search_plan.searches]
@@ -50,31 +64,32 @@ class ResearchManager:
         print("Finished searching")
         return results
 
-    async def search(self, item: WebSearchItem) -> str | None:
-        """ Perform a search for the query """
-        input = f"Search term: {item.query}\nReason for searching: {item.reason}"
+    async def search(self, item: WebSearchItem) -> Optional[str]:
+        """ Perform a single web search """
+        input_text = f"Search term: {item.query}\nReason for searching: {item.reason}"
         try:
             result = await Runner.run(
                 search_agent,
-                input,
+                input_text,
             )
             return str(result.final_output)
-        except Exception:
+        except Exception as e:
+            print(f"Search failed: {e}")
             return None
 
     async def write_report(self, query: str, search_results: list[str]) -> ReportData:
-        """ Write the report for the query """
+        """ Write a markdown report from search results """
         print("Thinking about report...")
-        input = f"Original query: {query}\nSummarized search results: {search_results}"
+        input_text = f"Original query: {query}\nSummarized search results: {search_results}"
         result = await Runner.run(
             writer_agent,
-            input,
+            input_text,
         )
-
         print("Finished writing report")
         return result.final_output_as(ReportData)
-    
+
     async def send_email(self, report: ReportData) -> None:
+        """ Send the report via email """
         print("Writing email...")
         result = await Runner.run(
             email_agent,
