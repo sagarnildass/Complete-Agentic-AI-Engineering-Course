@@ -9,7 +9,7 @@ clarifier_agent = Agent(
     name="ClarifierAgent",
     instructions=(
         "You are a research assistant. Your task is to ask 3 clarifying questions that help refine and understand "
-        "a research query better. These should help make the query more specific, contextual, or actionable."
+        "a research query better. After the user answers them, hand off control to the Research Coordinator to perform the full research."
     ),
     model="gpt-4o-mini",
     output_type=ClarifyingQuestions,
